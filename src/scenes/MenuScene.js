@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { GAME_CONSTANTS } from './GameScene';
 import { Storage } from '../systems/Storage';
+import { getSkinDefinition, getSkinOptions } from '../systems/Skins';
+import { useTouchInstructions } from '../systems/Device';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -9,22 +11,40 @@ export class MenuScene extends Phaser.Scene {
     this.menuContainer = null;
     this.instructionContainer = null;
     this.rankingContainer = null;
+    this.skinContainer = null;
+    this.skinPreview = null;
+    this.skinLabel = null;
+    this.skinOptions = [];
+    this.currentSkinIndex = 0;
+    this.skinLeftButton = null;
+    this.skinRightButton = null;
   }
 
   create() {
     const centerX = GAME_CONSTANTS.BASE_WIDTH / 2;
     const centerY = GAME_CONSTANTS.BASE_HEIGHT / 2;
+    const selectedSkinId = Storage.getSelectedSkin();
+    this.skinOptions = getSkinOptions();
+    this.currentSkinIndex = Math.max(0, this.skinOptions.findIndex((skin) => skin.id === selectedSkinId));
+    this.registry.set('selectedSkin', selectedSkinId);
+    const touchMode = useTouchInstructions(this);
 
     this.add.image(0, 0, 'menu_menu').setOrigin(0).setDisplaySize(GAME_CONSTANTS.BASE_WIDTH, GAME_CONSTANTS.BASE_HEIGHT);
     this.add.rectangle(centerX, centerY, GAME_CONSTANTS.BASE_WIDTH, GAME_CONSTANTS.BASE_HEIGHT, 0x020617, 0.32);
+
+    let logo = null;
+    if (this.textures.exists('logo_logo_end')) {
+      logo = this.add.image(centerX, centerY - 206, 'logo_logo_end').setOrigin(0.5);
+      logo.setDisplaySize(186, 105);
+    }
 
     const shadow = this.add.rectangle(centerX + 8, centerY + 8, 940, 560, 0x000000, 0.35);
     const card = this.add.rectangle(centerX, centerY, 940, 560, 0x03101d, 0.78).setStrokeStyle(3, 0x93c5fd, 0.6);
 
     const title = this.add
-      .text(centerX, centerY - 205, 'RUNMAGEDDON RUNNER', {
+      .text(centerX, centerY - 112, 'RUNMAGEDDON RUNNER', {
         fontFamily: 'monospace',
-        fontSize: '70px',
+        fontSize: '56px',
         color: '#f8fafc',
         stroke: '#0b1220',
         strokeThickness: 9,
@@ -32,20 +52,13 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const subtitle = this.add
-      .text(centerX, centerY - 126, 'Przebiegnij juz teraz Runmageddon z Alvernia Planet!', {
+      .text(centerX, centerY - 26, 'Przebiegnij juz teraz Runmageddon z Alvernia Planet!', {
         fontFamily: 'monospace',
-        fontSize: '25px',
+        fontSize: '24px',
         color: '#dbeafe',
       })
       .setOrigin(0.5);
 
-    const teaser = this.add
-      .text(centerX, centerY - 34, 'Tryb endless, rosnaca predkosc, ranking lokalny', {
-        fontFamily: 'monospace',
-        fontSize: '22px',
-        color: '#bfdbfe',
-      })
-      .setOrigin(0.5);
 
     const startButton = this.add
       .text(centerX - 150, centerY + 126, 'START', {
@@ -73,7 +86,21 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
 
-    this.menuContainer = this.add.container(0, 0, [shadow, card, title, subtitle, teaser, startButton, rankingButton]);
+    const skinButton = this.add
+      .text(centerX + 6, centerY + 212, 'SKIN', {
+        fontFamily: 'monospace',
+        fontSize: '32px',
+        color: '#e2e8f0',
+        backgroundColor: '#0f172a',
+        padding: { x: 24, y: 10 },
+        stroke: '#1e293b',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.menuContainer = this.add
+      .container(0, 0, [shadow, card, logo, title, subtitle, startButton, rankingButton, skinButton].filter(Boolean));
 
     const instrCard = this.add.rectangle(centerX, centerY, 940, 500, 0x03101d, 0.86).setStrokeStyle(3, 0xa7f3d0, 0.58);
     const instrTitle = this.add
@@ -84,11 +111,19 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
     const instrControls = this.add
-      .text(centerX, centerY - 154, 'SPACE/KLIK = SKOK   |   SHIFT/S/DOL = SLIDE', {
+      .text(
+        centerX,
+        centerY - 154,
+        touchMode
+          ? 'LEWA STRONA = SKOK   |   PRAWA STRONA (PRZYTRZYMAJ) = SLIDE'
+          : 'SPACE/KLIK = SKOK   |   SHIFT/S/DOL = SLIDE',
+        {
         fontFamily: 'monospace',
-        fontSize: '24px',
+        fontSize: '22px',
         color: '#bfdbfe',
-      })
+        align: 'center',
+        },
+      )
       .setOrigin(0.5);
 
     const rows = [];
@@ -101,7 +136,7 @@ export class MenuScene extends Phaser.Scene {
         const ch = Math.floor(icon.height * crop.h);
         icon.setCrop(cx, cy, cw, ch);
       }
-      icon.setDisplaySize(100, 46);
+      icon.setDisplaySize(132, 60);
       rows.push(icon);
     };
 
@@ -147,11 +182,16 @@ export class MenuScene extends Phaser.Scene {
     );
 
     const instrStart = this.add
-      .text(centerX, centerY + 176, 'Nacisnij SPACE / ENTER, aby wystartowac', {
+      .text(
+        centerX,
+        centerY + 176,
+        touchMode ? 'Dotknij ekranu, aby wystartowac' : 'Nacisnij SPACE / ENTER, aby wystartowac',
+        {
         fontFamily: 'monospace',
         fontSize: '24px',
         color: '#e2e8f0',
-      })
+        },
+      )
       .setOrigin(0.5);
 
     this.instructionContainer = this.add
@@ -187,6 +227,73 @@ export class MenuScene extends Phaser.Scene {
       .setVisible(false)
       .setAlpha(0)
       .setDepth(32);
+
+    const skinCard = this.add.rectangle(centerX, centerY, 760, 460, 0x03101d, 0.9).setStrokeStyle(3, 0x93c5fd, 0.58);
+    const skinTitle = this.add
+      .text(centerX, centerY - 180, 'WYBOR SKINA', {
+        fontFamily: 'monospace',
+        fontSize: '46px',
+        color: '#bfdbfe',
+      })
+      .setOrigin(0.5);
+
+    this.skinPreview = this.add.sprite(centerX, centerY - 30, 'runner_run_1').setOrigin(0.5);
+    this.skinPreview.setDisplaySize(180, 240);
+
+    this.skinLabel = this.add
+      .text(centerX, centerY + 92, '', {
+        fontFamily: 'monospace',
+        fontSize: '30px',
+        color: '#e2e8f0',
+      })
+      .setOrigin(0.5);
+
+    this.skinLeftButton = this.add
+      .text(centerX - 170, centerY + 146, '<', {
+        fontFamily: 'monospace',
+        fontSize: '44px',
+        color: '#e2e8f0',
+        backgroundColor: '#1e293b',
+        padding: { x: 18, y: 4 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.skinRightButton = this.add
+      .text(centerX + 170, centerY + 146, '>', {
+        fontFamily: 'monospace',
+        fontSize: '44px',
+        color: '#e2e8f0',
+        backgroundColor: '#1e293b',
+        padding: { x: 18, y: 4 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    const skinBackButton = this.add
+      .text(centerX, centerY + 196, 'POWROT', {
+        fontFamily: 'monospace',
+        fontSize: '34px',
+        color: '#e2e8f0',
+        backgroundColor: '#334155',
+        padding: { x: 20, y: 10 },
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.skinContainer = this.add
+      .container(0, 0, [
+        skinCard,
+        skinTitle,
+        this.skinPreview,
+        this.skinLabel,
+        this.skinLeftButton,
+        this.skinRightButton,
+        skinBackButton,
+      ])
+      .setVisible(false)
+      .setAlpha(0)
+      .setDepth(33);
 
     const startRun = () => {
       if (!this.isArmed) return;
@@ -236,6 +343,29 @@ export class MenuScene extends Phaser.Scene {
       this.menuContainer.alpha = 1;
     });
 
+    skinButton.on('pointerdown', () => {
+      this.menuContainer.setVisible(false);
+      this.skinContainer.setVisible(true);
+      this.skinContainer.alpha = 0;
+      this.tweens.add({
+        targets: this.skinContainer,
+        alpha: 1,
+        duration: 220,
+        ease: 'Quad.Out',
+      });
+    });
+
+    this.skinLeftButton.on('pointerdown', () => this.cycleSkin(-1));
+    this.skinRightButton.on('pointerdown', () => this.cycleSkin(1));
+
+    skinBackButton.on('pointerdown', () => {
+      this.skinContainer.setVisible(false);
+      this.menuContainer.setVisible(true);
+      this.menuContainer.alpha = 1;
+    });
+
+    this.applySkinSelection(selectedSkinId);
+
     this.input.keyboard.on('keydown-SPACE', startRun);
     this.input.keyboard.on('keydown-ENTER', startRun);
 
@@ -261,4 +391,40 @@ export class MenuScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0);
   }
+
+  applySkinSelection(skinId) {
+    const skin = getSkinDefinition(skinId);
+    const defaultSkin = getSkinDefinition('default');
+    const safeId = skin?.id ?? 'default';
+
+    Storage.setSelectedSkin(safeId);
+    this.registry.set('selectedSkin', safeId);
+    this.currentSkinIndex = Math.max(0, this.skinOptions.findIndex((skinItem) => skinItem.id === safeId));
+
+    this.skinLabel?.setText(skin.label);
+    const previewKey = this.textures.exists(skin.textureKeys.preview)
+      ? skin.textureKeys.preview
+      : defaultSkin.textureKeys.preview;
+    this.skinPreview?.setTexture(previewKey);
+    const source = this.textures.get(previewKey)?.getSourceImage();
+    if (source && this.skinPreview) {
+      const maxHeight = skin.id === 'o' ? 240 : 220;
+      const width = Math.floor(maxHeight * (source.width / source.height));
+      this.skinPreview.setDisplaySize(width, maxHeight);
+    }
+    if (this.skinPreview?.anims?.isPlaying) {
+      this.skinPreview.anims.stop();
+    }
+    if (this.skinPreview && this.anims.exists(skin.animKeys.idle)) {
+      this.skinPreview.play(skin.animKeys.idle, true);
+    }
+  }
+
+  cycleSkin(step) {
+    if (!this.skinOptions.length) return;
+    const len = this.skinOptions.length;
+    this.currentSkinIndex = (this.currentSkinIndex + step + len) % len;
+    this.applySkinSelection(this.skinOptions[this.currentSkinIndex].id);
+  }
+
 }

@@ -1,8 +1,21 @@
 const STORAGE_KEY = 'runmageddon_runner_highscore';
 const RANKING_KEY = 'runmageddon_runner_ranking';
+const SKIN_KEY = 'runmageddon_runner_skin';
 const MAX_RANKING_ENTRIES = 10;
 
 export class Storage {
+  static getSelectedSkin() {
+    const raw = localStorage.getItem(SKIN_KEY);
+    if (!raw) return 'default';
+    return ['default', 'o', 'michalina', 'paulina'].includes(raw) ? raw : 'default';
+  }
+
+  static setSelectedSkin(skinId) {
+    const safe = ['default', 'o', 'michalina', 'paulina'].includes(skinId) ? skinId : 'default';
+    localStorage.setItem(SKIN_KEY, safe);
+    return safe;
+  }
+
   static getHighscore() {
     const rawValue = localStorage.getItem(STORAGE_KEY);
 

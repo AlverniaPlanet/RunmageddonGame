@@ -1,8 +1,17 @@
 import Phaser from 'phaser';
+import { getSkinDefinition } from '../systems/Skins';
+
+const CHARACTER_CROPS = {
+  run: { x: 0.29, y: 0.16, w: 0.42, h: 0.7 },
+  slide: { x: 0.23, y: 0.08, w: 0.54, h: 0.84 },
+  jump: { x: 0.23, y: 0.08, w: 0.54, h: 0.84 },
+  dead: { x: 0.23, y: 0.08, w: 0.54, h: 0.84 },
+};
 
 export class Player extends Phaser.GameObjects.Sprite {
   constructor(scene, x, groundY, config) {
-    super(scene, x, groundY, 'runner_run_1');
+    const skin = getSkinDefinition(config.skinId);
+    super(scene, x, groundY, skin.textureKeys.runStart);
 
     this.scene = scene;
     this.fixedX = x;
@@ -10,27 +19,39 @@ export class Player extends Phaser.GameObjects.Sprite {
 
     this.jumpVelocity = config.jumpVelocity;
     this.gravity = config.gravity;
+    this.skin = skin;
+    this.runAnimKey = skin.animKeys.run;
+    this.slideAnimKey = skin.animKeys.slide;
+    this.jumpAnimKey = skin.animKeys.jump;
+    this.runStartTexture = skin.textureKeys.runStart;
+    this.deadTexture = skin.textureKeys.dead;
+    this.deadYOffset = skin.deadYOffset ?? 0;
     this.velocityY = 0;
     this.isSliding = false;
+    this.runAnimationEnabled = true;
+    this.slideLift = config.slideLift ?? skin.slideLift ?? 14;
 
     scene.add.existing(this);
     this.applyCharacterCrop();
 
     this.setOrigin(0.5, 1);
-    this.setDisplaySize(config.displayWidth, config.displayHeight);
+    const gameplayScale = this.skin.gameplayScale ?? 1;
+    this.setDisplaySize(config.displayWidth * gameplayScale, config.displayHeight * gameplayScale);
     this.baseScaleX = this.scaleX;
     this.baseScaleY = this.scaleY;
-    this.play('runner-run');
+    this.play(this.runAnimKey);
   }
 
-  applyCharacterCrop() {
+  applyCharacterCrop(preset = 'run') {
     // Character source textures are large canvases with centered subject.
+    const skinCrops = this.skin?.crops ?? {};
+    const crop = skinCrops[preset] ?? CHARACTER_CROPS[preset] ?? CHARACTER_CROPS.run;
     const sourceWidth = this.width;
     const sourceHeight = this.height;
-    const cropX = Math.floor(sourceWidth * 0.29);
-    const cropY = Math.floor(sourceHeight * 0.16);
-    const cropW = Math.floor(sourceWidth * 0.42);
-    const cropH = Math.floor(sourceHeight * 0.7);
+    const cropX = Math.floor(sourceWidth * crop.x);
+    const cropY = Math.floor(sourceHeight * crop.y);
+    const cropW = Math.floor(sourceWidth * crop.w);
+    const cropH = Math.floor(sourceHeight * crop.h);
     this.setCrop(cropX, cropY, cropW, cropH);
   }
 
@@ -38,6 +59,12 @@ export class Player extends Phaser.GameObjects.Sprite {
     const dt = delta / 1000;
 
     this.x = this.fixedX;
+    if (this.isSliding) {
+      this.y = this.groundY - this.slideLift;
+      this.velocityY = 0;
+      this.syncAnimationState();
+      return;
+    }
 
     if (!this.isGrounded() || this.velocityY !== 0) {
       this.velocityY += this.gravity * dt;
@@ -48,10 +75,13 @@ export class Player extends Phaser.GameObjects.Sprite {
         this.velocityY = 0;
       }
     }
-
+    this.syncAnimationState();
   }
 
   isGrounded() {
+    if (this.isSliding) {
+      return this.y >= this.groundY - this.slideLift - 0.5;
+    }
     return this.y >= this.groundY - 0.5;
   }
 
@@ -62,6 +92,7 @@ export class Player extends Phaser.GameObjects.Sprite {
 
     this.velocityY = this.jumpVelocity;
     this.y = Math.min(this.y, this.groundY - 1);
+    this.playJumpAnimation();
     return true;
   }
 
@@ -71,7 +102,9 @@ export class Player extends Phaser.GameObjects.Sprite {
     }
 
     this.isSliding = true;
-    this.setScale(this.baseScaleX * 0.92, this.baseScaleY * 0.6);
+    this.setScale(this.baseScaleX * 0.95, this.baseScaleY * 0.74);
+    this.y = this.groundY - this.slideLift;
+    this.playSlideAnimation();
     return true;
   }
 
@@ -82,6 +115,8 @@ export class Player extends Phaser.GameObjects.Sprite {
 
     this.isSliding = false;
     this.setScale(this.baseScaleX, this.baseScaleY);
+    this.y = this.groundY;
+    this.syncAnimationState();
   }
 
   setSlideHeld(isHeld) {
@@ -94,17 +129,66 @@ export class Player extends Phaser.GameObjects.Sprite {
   }
 
   setStartPose() {
+    this.runAnimationEnabled = false;
     this.anims.stop();
-    this.setTexture('runner_run_1');
-    this.applyCharacterCrop();
+    this.setTexture(this.runStartTexture);
+    this.applyCharacterCrop('run');
     this.setScale(this.baseScaleX, this.baseScaleY);
     this.isSliding = false;
+    this.velocityY = 0;
+    this.y = this.groundY;
   }
 
   startRunAnimation() {
-    this.setTexture('runner_run_1');
-    this.applyCharacterCrop();
-    this.play('runner-run', true);
+    this.runAnimationEnabled = true;
+    this.setTexture(this.runStartTexture);
+    this.applyCharacterCrop('run');
+    this.play(this.runAnimKey, true);
+  }
+
+  showDeadPose() {
+    this.runAnimationEnabled = false;
+    this.anims.stop();
+    this.setTexture(this.deadTexture);
+    this.applyCharacterCrop('dead');
+    this.setScale(this.baseScaleX, this.baseScaleY);
+    this.isSliding = false;
+    this.velocityY = 0;
+    this.y = this.groundY + this.deadYOffset;
+  }
+
+  playRunAnimation() {
+    if (!this.runAnimationEnabled) return;
+    this.applyCharacterCrop('run');
+    if (this.anims.currentAnim?.key === this.runAnimKey && this.anims.isPlaying) return;
+    this.play(this.runAnimKey, true);
+  }
+
+  playSlideAnimation() {
+    if (!this.runAnimationEnabled) return;
+    this.applyCharacterCrop('slide');
+    if (this.anims.currentAnim?.key === this.slideAnimKey && this.anims.isPlaying) return;
+    this.play(this.slideAnimKey, true);
+  }
+
+  playJumpAnimation() {
+    if (!this.runAnimationEnabled) return;
+    this.applyCharacterCrop('jump');
+    if (this.anims.currentAnim?.key === this.jumpAnimKey && this.anims.isPlaying) return;
+    this.play(this.jumpAnimKey, true);
+  }
+
+  syncAnimationState() {
+    if (!this.runAnimationEnabled) return;
+    if (this.isSliding) {
+      this.playSlideAnimation();
+      return;
+    }
+    if (!this.isGrounded()) {
+      this.playJumpAnimation();
+      return;
+    }
+    this.playRunAnimation();
   }
 
   getHitbox() {

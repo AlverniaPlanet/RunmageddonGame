@@ -4,6 +4,8 @@ import { Obstacle } from '../entities/Obstacle';
 import { Parallax } from '../systems/Parallax';
 import { Spawner } from '../systems/Spawner';
 import { Storage } from '../systems/Storage';
+import { resolveSkinId } from '../systems/Skins';
+import { useTouchInstructions } from '../systems/Device';
 
 export const GAME_CONSTANTS = {
   BASE_WIDTH: 1280,
@@ -47,10 +49,11 @@ export const GAME_CONSTANTS = {
   WATER_SLOW_MULTIPLIER: 0.6,
   WATER_SLOW_MS: 1300,
   LOSE_GATE_HEIGHT: 240,
-  PROJECTILE_COOLDOWN_MS: 2800,
+  BIRD_BASE_COOLDOWN_MS: 1500,
+  BIRD_MIN_COOLDOWN_MS: 700,
   MIN_TIME_GAP_SEC: 0.26,
   CONFLICT_GAP_SEC: 0.62,
-  PROJECTILE_GAP_SEC: 0.5,
+  BIRD_GAP_SEC: 0.5,
 
   DEBUG_HITBOXES: false,
 };
@@ -133,27 +136,29 @@ const OBSTACLE_DEFINITIONS = [
   },
 ];
 
-const PROJECTILE_DEFINITIONS = [
+const BIRD_DEFINITIONS = [
   {
-    type: 'projectile_jump',
-    textureKey: 'projectile_arrow',
-    behavior: 'dual',
-    yOffset: 2,
-    displayWidth: 78,
-    displayHeight: 28,
-    hitbox: { width: 58, height: 16, offsetX: 0, bottomOffset: 0 },
-    speedMultiplier: 1.32,
+    type: 'bird_jump',
+    textureKey: 'bird1_1',
+    animKey: 'bird-jump-fly',
+    behavior: 'jump',
+    yOffset: -34,
+    displayWidth: 124,
+    displayHeight: 64,
+    hitbox: { width: 56, height: 24, offsetX: 0, bottomOffset: 18 },
+    speedMultiplier: 1.24,
     crop: { x: 0, y: 0, w: 1, h: 1 },
   },
   {
-    type: 'projectile_slide',
-    textureKey: 'projectile_arrow',
-    behavior: 'dual',
-    yOffset: -72,
-    displayWidth: 86,
-    displayHeight: 30,
-    hitbox: { width: 62, height: 18, offsetX: 0, bottomOffset: 2 },
-    speedMultiplier: 1.4,
+    type: 'bird_slide',
+    textureKey: 'bird2_1',
+    animKey: 'bird-slide-fly',
+    behavior: 'slide',
+    yOffset: -138,
+    displayWidth: 132,
+    displayHeight: 68,
+    hitbox: { width: 62, height: 22, offsetX: 0, bottomOffset: 16 },
+    speedMultiplier: 1.32,
     crop: { x: 0, y: 0, w: 1, h: 1 },
   },
 ];
@@ -191,8 +196,8 @@ export class GameScene extends Phaser.Scene {
     this.runStarted = false;
     this.startOverlay = null;
     this.startStructure = null;
-    this.lastProjectileSpawnAt = -99999;
-    this.projectileTimer = null;
+    this.lastBirdSpawnAt = -99999;
+    this.birdSpawnTimer = null;
 
     this.debugEnabled = GAME_CONSTANTS.DEBUG_HITBOXES;
     this.debugGraphics = null;
@@ -200,6 +205,11 @@ export class GameScene extends Phaser.Scene {
     this.hKey = null;
     this.pendingSpacePresses = 0;
     this.boundSpaceKeyHandler = null;
+    this.boundPointerDownHandler = null;
+    this.boundPointerUpHandler = null;
+    this.boundGameOutHandler = null;
+    this.touchSlideHeld = false;
+    this.touchSlidePointerId = null;
   }
 
   create() {
@@ -219,9 +229,11 @@ export class GameScene extends Phaser.Scene {
     this.mashState = null;
     this.obstacles = [];
     this.runStarted = false;
-    this.lastProjectileSpawnAt = -99999;
-    this.projectileTimer = null;
+    this.lastBirdSpawnAt = -99999;
+    this.birdSpawnTimer = null;
     this.pendingSpacePresses = 0;
+    this.touchSlideHeld = false;
+    this.touchSlidePointerId = null;
 
     this.spawner = new Spawner(
       this,
@@ -255,13 +267,25 @@ export class GameScene extends Phaser.Scene {
       if (this.spawner) {
         this.spawner.destroy();
       }
-      if (this.projectileTimer) {
-        this.projectileTimer.remove(false);
-        this.projectileTimer = null;
+      if (this.birdSpawnTimer) {
+        this.birdSpawnTimer.remove(false);
+        this.birdSpawnTimer = null;
       }
       if (this.boundSpaceKeyHandler) {
         this.input.keyboard.off('keydown-SPACE', this.boundSpaceKeyHandler);
         this.boundSpaceKeyHandler = null;
+      }
+      if (this.boundPointerDownHandler) {
+        this.input.off('pointerdown', this.boundPointerDownHandler);
+        this.boundPointerDownHandler = null;
+      }
+      if (this.boundPointerUpHandler) {
+        this.input.off('pointerup', this.boundPointerUpHandler);
+        this.boundPointerUpHandler = null;
+      }
+      if (this.boundGameOutHandler) {
+        this.input.off('gameout', this.boundGameOutHandler);
+        this.boundGameOutHandler = null;
       }
       this.game.events.off('ui:restart', this.boundRestartHandler);
     });
@@ -317,11 +341,14 @@ export class GameScene extends Phaser.Scene {
   }
 
   createPlayer() {
+    const requestedSkin = this.registry.get('selectedSkin') ?? Storage.getSelectedSkin();
+    const selectedSkin = resolveSkinId(this, requestedSkin);
     this.player = new Player(this, GAME_CONSTANTS.PLAYER_X, GAME_CONSTANTS.GROUND_SURFACE_Y, {
       displayWidth: GAME_CONSTANTS.PLAYER_DISPLAY_WIDTH,
       displayHeight: GAME_CONSTANTS.PLAYER_DISPLAY_HEIGHT,
       jumpVelocity: GAME_CONSTANTS.JUMP_VELOCITY,
       gravity: GAME_CONSTANTS.PLAYER_GRAVITY,
+      skinId: selectedSkin,
     });
 
     this.player.setDepth(62);
@@ -339,40 +366,74 @@ export class GameScene extends Phaser.Scene {
     };
     this.input.keyboard.on('keydown-SPACE', this.boundSpaceKeyHandler);
 
-    this.input.on('pointerdown', () => {
+    this.boundPointerDownHandler = (pointer) => {
       if (this.isFinished) return;
       if (this.mashState?.active) {
         this.registerMashClick();
         return;
       }
+
+      const isTouchPointer = pointer.pointerType === 'touch' || pointer.wasTouch === true;
+      const isRightHalf = pointer.x >= GAME_CONSTANTS.BASE_WIDTH / 2;
+      if (isTouchPointer && isRightHalf) {
+        this.touchSlideHeld = true;
+        this.touchSlidePointerId = pointer.id;
+        if (!this.runStarted) {
+          this.beginRun();
+        }
+        return;
+      }
+
       this.tryJump();
-    });
+    };
+    this.input.on('pointerdown', this.boundPointerDownHandler);
+
+    this.boundPointerUpHandler = (pointer) => {
+      if (pointer.id === this.touchSlidePointerId) {
+        this.touchSlideHeld = false;
+        this.touchSlidePointerId = null;
+      }
+    };
+    this.input.on('pointerup', this.boundPointerUpHandler);
+
+    this.boundGameOutHandler = () => {
+      this.touchSlideHeld = false;
+      this.touchSlidePointerId = null;
+    };
+    this.input.on('gameout', this.boundGameOutHandler);
   }
 
   createStartOverlay() {
     const centerX = GAME_CONSTANTS.BASE_WIDTH / 2;
     const centerY = GAME_CONSTANTS.BASE_HEIGHT / 2;
+    const touchMode = useTouchInstructions(this);
 
     // Start gate is placed in world space at spawn and then scrolls away with the world.
     this.startStructure = this.add
       .image(
         GAME_CONSTANTS.PLAYER_X - 34,
-        GAME_CONSTANTS.GROUND_SURFACE_Y + GAME_CONSTANTS.START_GATE_GROUND_OFFSET,
+        GAME_CONSTANTS.GROUND_SURFACE_Y + GAME_CONSTANTS.START_GATE_GROUND_OFFSET + 70,
         'start_start',
       )
       .setOrigin(0.5, 1)
       .setDepth(38);
     const ratio = this.startStructure.width / this.startStructure.height;
-    this.startStructure.setDisplaySize(240 * ratio, 240);
+    this.startStructure.setDisplaySize(500 * ratio, 500);
 
     const hint = this.add
-      .text(centerX, centerY + 220, 'Nacisnij SPACE lub kliknij, aby zaczac', {
+      .text(
+        centerX,
+        centerY + 220,
+        touchMode ? 'DOTKNIJ EKRANU ABY ZACZAC | LEWA=SKOK, PRAWA(TRZYMAJ)=SLIDE' : 'SPACE/KLIK = START',
+        {
         fontFamily: 'monospace',
-        fontSize: '40px',
+        fontSize: touchMode ? '26px' : '36px',
         color: '#e2e8f0',
         stroke: '#0b1220',
         strokeThickness: 8,
-      })
+        align: 'center',
+        },
+      )
       .setOrigin(0.5)
       .setDepth(252);
 
@@ -402,8 +463,8 @@ export class GameScene extends Phaser.Scene {
       this.scrollSpeed,
     );
 
-    if (definition.type.startsWith('projectile_')) {
-      this.lastProjectileSpawnAt = this.time.now;
+    if (definition.type.startsWith('bird_')) {
+      this.lastBirdSpawnAt = this.time.now;
     }
 
     this.obstacles.push(obstacle);
@@ -416,8 +477,8 @@ export class GameScene extends Phaser.Scene {
     return 'neutral';
   }
 
-  isProjectile(defOrObstacle) {
-    return (defOrObstacle.type ?? '').startsWith('projectile_');
+  isBirdHazard(defOrObstacle) {
+    return (defOrObstacle.type ?? '').startsWith('bird_');
   }
 
   estimateTriggerX(defOrObstacle) {
@@ -438,24 +499,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (
-      this.isProjectile(definition) &&
-      this.time.now - this.lastProjectileSpawnAt < GAME_CONSTANTS.PROJECTILE_COOLDOWN_MS
+      this.isBirdHazard(definition) &&
+      this.time.now - this.lastBirdSpawnAt < this.getBirdCooldownMs()
     ) {
       return false;
-    }
-
-    if (this.isProjectile(definition)) {
-      // Projectiles are spawned only when the near lane is relatively clear.
-      const blocking = this.obstacles.some(
-        (obstacle) =>
-          obstacle.active &&
-          !obstacle.isResolved &&
-          obstacle.x > this.player.x + 36 &&
-          obstacle.x < GAME_CONSTANTS.BASE_WIDTH - 70,
-      );
-      if (blocking) {
-        return false;
-      }
     }
 
     const spawnX = GAME_CONSTANTS.BASE_WIDTH + 220;
@@ -473,11 +520,32 @@ export class GameScene extends Phaser.Scene {
       if (etaExisting < -0.05) continue;
 
       const delta = Math.abs(etaNew - etaExisting);
+      const newIsBird = this.isBirdHazard(definition);
+      const existingIsBird = this.isBirdHazard(obstacle);
+      const actionExisting = this.getRequiredAction(obstacle);
+
+      // Bird + non-bird must stay fair-play: enough time for 2 separate reactions.
+      if (newIsBird !== existingIsBird) {
+        const oppositeActions =
+          (actionNew === 'jump' && actionExisting === 'slide') ||
+          (actionNew === 'slide' && actionExisting === 'jump');
+
+        // Opposite reactions (jump then slide / slide then jump) need clearly separated windows.
+        if (oppositeActions && delta < 1.05) {
+          return false;
+        }
+
+        // Same reaction still needs spacing for a second input/read.
+        if (!oppositeActions && delta < 0.62) {
+          return false;
+        }
+        continue;
+      }
+
       if (delta < GAME_CONSTANTS.MIN_TIME_GAP_SEC) {
         return false;
       }
 
-      const actionExisting = this.getRequiredAction(obstacle);
       const oppositeActions =
         (actionNew === 'jump' && actionExisting === 'slide') ||
         (actionNew === 'slide' && actionExisting === 'jump');
@@ -485,14 +553,8 @@ export class GameScene extends Phaser.Scene {
         return false;
       }
 
-      const projectileMix = this.isProjectile(definition) && this.isProjectile(obstacle);
-      if (projectileMix && delta < GAME_CONSTANTS.PROJECTILE_GAP_SEC) {
-        return false;
-      }
-
-      // Avoid projectile + other obstacle overlap in the same reaction window.
-      const oneIsProjectile = this.isProjectile(definition) !== this.isProjectile(obstacle);
-      if (oneIsProjectile && delta < 1.1) {
+      const birdMix = newIsBird && existingIsBird;
+      if (birdMix && delta < GAME_CONSTANTS.BIRD_GAP_SEC) {
         return false;
       }
     }
@@ -547,7 +609,7 @@ export class GameScene extends Phaser.Scene {
       this.tryJump();
     }
 
-    const slideHeld = this.shiftKey.isDown || this.sKey.isDown || this.cursors.down.isDown;
+    const slideHeld = this.shiftKey.isDown || this.sKey.isDown || this.cursors.down.isDown || this.touchSlideHeld;
     this.player.setSlideHeld(slideHeld);
   }
 
@@ -567,7 +629,7 @@ export class GameScene extends Phaser.Scene {
     this.runStarted = true;
     this.player.startRunAnimation();
     this.spawner.start();
-    this.startProjectileTicker();
+    this.startBirdTicker();
 
     if (this.startOverlay) {
       this.tweens.add({
@@ -584,31 +646,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  startProjectileTicker() {
-    if (this.projectileTimer) {
-      this.projectileTimer.remove(false);
-      this.projectileTimer = null;
+  startBirdTicker() {
+    if (this.birdSpawnTimer) {
+      this.birdSpawnTimer.remove(false);
+      this.birdSpawnTimer = null;
     }
 
-    this.projectileTimer = this.time.addEvent({
-      delay: 4200,
-      loop: true,
-      callback: () => {
-        if (!this.runStarted || this.isFinished) return;
-        const order =
-          Phaser.Math.Between(0, 1) === 0
-            ? ['projectile_jump', 'projectile_slide']
-            : ['projectile_slide', 'projectile_jump'];
+    const scheduleNext = () => {
+      if (!this.runStarted || this.isFinished) return;
 
-        for (const type of order) {
-          const definition = PROJECTILE_DEFINITIONS.find((entry) => entry.type === type);
-          if (definition && this.canSpawnDefinition(definition)) {
-            this.spawnObstacle(definition);
-            break;
-          }
+      const order = Phaser.Math.Between(0, 1) === 0 ? ['bird_jump', 'bird_slide'] : ['bird_slide', 'bird_jump'];
+      for (const type of order) {
+        const definition = BIRD_DEFINITIONS.find((entry) => entry.type === type);
+        if (definition && this.canSpawnDefinition(definition)) {
+          this.spawnObstacle(definition);
+          break;
         }
-      },
-    });
+      }
+
+      this.birdSpawnTimer = this.time.delayedCall(this.getBirdSpawnDelayMs(), scheduleNext);
+    };
+
+    this.birdSpawnTimer = this.time.delayedCall(1200, scheduleNext);
+  }
+
+  getBirdSpawnDelayMs() {
+    const t = Phaser.Math.Clamp((this.elapsedMs / 1000) / 75, 0, 1);
+    return Math.floor(Phaser.Math.Linear(2600, 900, t));
+  }
+
+  getBirdCooldownMs() {
+    const t = Phaser.Math.Clamp((this.elapsedMs / 1000) / 75, 0, 1);
+    return Math.floor(Phaser.Math.Linear(GAME_CONSTANTS.BIRD_BASE_COOLDOWN_MS, GAME_CONSTANTS.BIRD_MIN_COOLDOWN_MS, t));
   }
 
   updateRunState(delta) {
@@ -928,9 +997,9 @@ export class GameScene extends Phaser.Scene {
     this.isFinished = true;
 
     if (this.spawner) this.spawner.stop();
-    if (this.projectileTimer) {
-      this.projectileTimer.remove(false);
-      this.projectileTimer = null;
+    if (this.birdSpawnTimer) {
+      this.birdSpawnTimer.remove(false);
+      this.birdSpawnTimer = null;
     }
 
     if (result === 'lose') {
@@ -939,7 +1008,11 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.player?.isSliding) this.player.endSlide();
-    if (this.player?.anims?.isPlaying) this.player.anims.pause();
+    if (result === 'lose') {
+      this.player?.showDeadPose?.();
+    } else if (this.player?.anims?.isPlaying) {
+      this.player.anims.pause();
+    }
 
     if (result === 'lose') {
       this.playLoseGateReveal(() => this.finalizeRunResult(result));

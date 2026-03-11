@@ -31,6 +31,10 @@ export class Obstacle extends Phaser.GameObjects.Sprite {
     this.setDisplaySize(definition.displayWidth, definition.displayHeight);
     this.setAlpha(1);
     this.setDepth(58);
+
+    if (definition.animKey) {
+      this.play(definition.animKey, true);
+    }
   }
 
   setSpeed(speed) {

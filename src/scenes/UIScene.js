@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_CONSTANTS } from './GameScene';
 import { Storage } from '../systems/Storage';
+import { useTouchInstructions } from '../systems/Device';
 
 export class UIScene extends Phaser.Scene {
   constructor() {
@@ -15,10 +16,15 @@ export class UIScene extends Phaser.Scene {
     this.penaltyText = null;
 
     this.endOverlay = null;
+    this.hudTopBand = null;
+    this.hudStatsPlate = null;
+    this.hudLogoPlate = null;
+    this.hudLogo = null;
   }
 
   create() {
     this.createHud();
+    this.createHudLogo();
     this.createIntro();
     this.createMashOverlay();
     this.createPenaltyOverlay();
@@ -50,18 +56,37 @@ export class UIScene extends Phaser.Scene {
   }
 
   createHud() {
+    this.hudStatsPlate = this.add
+      .rectangle(262, 28, 500, 36, 0x000000, 0.58)
+      .setStrokeStyle(1, 0x93c5fd, 0.34)
+      .setDepth(199);
+
     this.hudText = this.add
-      .text(24, 20, '', {
+      .text(26, 13, '', {
         fontFamily: 'monospace',
-        fontSize: '28px',
+        fontSize: '18px',
         color: '#ffffff',
-        stroke: '#111827',
-        strokeThickness: 4,
+        stroke: '#020617',
+        strokeThickness: 3,
       })
       .setDepth(200);
   }
 
+  createHudLogo() {
+    const x = GAME_CONSTANTS.BASE_WIDTH / 2;
+    const y = 33;
+
+    if (this.textures.exists('logo_logo_hud')) {
+      this.hudLogo = this.add
+        .image(x, y, 'logo_logo_hud')
+        .setOrigin(0.5)
+        .setDepth(215)
+        .setAlpha(1);
+    }
+  }
+
   createIntro() {
+    const touchMode = useTouchInstructions(this);
     const bg = this.add
       .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2, 95, 860, 100, 0x000000, 0.58)
       .setDepth(210);
@@ -70,11 +95,14 @@ export class UIScene extends Phaser.Scene {
       .text(
         GAME_CONSTANTS.BASE_WIDTH / 2,
         95,
-        'SPACE / Klik = SKOK   |   SHIFT / S / strzalka w dol = KUCANIE',
+        touchMode
+          ? 'LEWA STRONA = SKOK | PRAWA STRONA (TRZYMAJ) = KUCANIE'
+          : 'SPACE/KLIK = SKOK | SHIFT/S/DOL = KUCANIE',
         {
           fontFamily: 'monospace',
-          fontSize: '26px',
+          fontSize: '24px',
           color: '#f9fafb',
+          align: 'center',
         },
       )
       .setOrigin(0.5)
@@ -121,7 +149,7 @@ export class UIScene extends Phaser.Scene {
   }
 
   onHudUpdate({ time, score, speed }) {
-    this.hudText.setText(`Time: ${time.toFixed(1)}   Score: ${score}   Speed: ${speed}`);
+    this.hudText.setText(`Predkosc: ${speed}   Punkty: ${score}   Czas: ${time.toFixed(1)} s`);
   }
 
   showIntro() {
@@ -191,15 +219,23 @@ export class UIScene extends Phaser.Scene {
 
     const title = result === 'win' ? 'META! WYGRANA' : 'GAME OVER';
     const panelShadow = this.add
-      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2 + 8, GAME_CONSTANTS.BASE_HEIGHT / 2 + 8, 780, 560, 0x000000, 0.45)
+      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2 + 8, GAME_CONSTANTS.BASE_HEIGHT / 2 + 40, 780, 620, 0x000000, 0.45)
       .setDepth(259);
     const box = this.add
-      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2, GAME_CONSTANTS.BASE_HEIGHT / 2, 780, 560, 0x020617, 0.9)
+      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2, GAME_CONSTANTS.BASE_HEIGHT / 2 + 32, 780, 620, 0x020617, 0.9)
       .setStrokeStyle(3, 0x93c5fd, 0.5)
       .setDepth(260);
 
+    let endLogo = null;
+    if (this.textures.exists('logo_logo_end')) {
+      endLogo = this.add
+        .image(GAME_CONSTANTS.BASE_WIDTH / 2, 160, 'logo_logo_end')
+        .setOrigin(0.5)
+        .setDepth(262);
+    }
+
     const titleText = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 228, title, {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 284, title, {
         fontFamily: 'monospace',
         fontSize: '48px',
         color: '#f9fafb',
@@ -208,7 +244,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(261);
 
     const scoreText = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 292, `Wynik: ${score}`, {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 342, `Wynik: ${score}`, {
         fontFamily: 'monospace',
         fontSize: '32px',
         color: '#e5e7eb',
@@ -217,7 +253,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(261);
 
     const highscoreText = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 336, `Highscore: ${highscore}`, {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 384, `Najlepszy wynik: ${highscore}`, {
         fontFamily: 'monospace',
         fontSize: '30px',
         color: '#fde68a',
@@ -225,10 +261,41 @@ export class UIScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(261);
 
-    const restartButton = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 552, 'Restart', {
+    const formatRankingLines = (items) =>
+      items
+        .slice(0, 4)
+        .map((item, index) => {
+          const safeName = String(item.name ?? 'Anon').trim() || 'Anon';
+          const shortName = safeName.length > 14 ? `${safeName.slice(0, 13)}.` : safeName;
+          return `${index + 1}. ${shortName}: ${item.score}`;
+        })
+        .join('\n');
+
+    const rankingTitle = this.add
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 422, 'Ranking', {
         fontFamily: 'monospace',
-        fontSize: '34px',
+        fontSize: '26px',
+        color: '#93c5fd',
+      })
+      .setOrigin(0.5)
+      .setDepth(261);
+
+    const rankingText = formatRankingLines(ranking);
+    const rankingLine = this.add
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 448, rankingText || 'Brak wynikow', {
+        fontFamily: 'monospace',
+        fontSize: '20px',
+        color: '#e2e8f0',
+        align: 'center',
+        lineSpacing: 4,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(261);
+
+    const restartButton = this.add
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 552, 'Zagraj ponownie', {
+        fontFamily: 'monospace',
+        fontSize: '28px',
         color: '#86efac',
         backgroundColor: '#14532d',
         padding: { x: 16, y: 8 },
@@ -242,9 +309,9 @@ export class UIScene extends Phaser.Scene {
       });
 
     const ctaButton = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 606, 'Zapisz sie', {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 600, 'Zapisz wynik', {
         fontFamily: 'monospace',
-        fontSize: '30px',
+        fontSize: '28px',
         color: '#bfdbfe',
         backgroundColor: '#1e3a8a',
         padding: { x: 16, y: 8 },
@@ -257,37 +324,34 @@ export class UIScene extends Phaser.Scene {
         if (typed === null) return;
 
         const updated = Storage.setEntryName(entryId, typed);
-        const refreshed = updated.slice(0, 5).map((item, index) => `${index + 1}. ${item.name}: ${item.score}`).join('\n');
+        const refreshed = formatRankingLines(updated);
         rankingLine.setText(refreshed || 'Brak wynikow');
       });
 
-    const rankingTitle = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 382, 'Ranking', {
+    const menuButton = this.add
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 646, 'Menu', {
         fontFamily: 'monospace',
-        fontSize: '26px',
-        color: '#93c5fd',
+        fontSize: '24px',
+        color: '#e2e8f0',
+        backgroundColor: '#334155',
+        padding: { x: 14, y: 8 },
       })
       .setOrigin(0.5)
-      .setDepth(261);
-
-    const rankingText = ranking
-      .slice(0, 5)
-      .map((item, index) => `${index + 1}. ${item.name}: ${item.score}`)
-      .join('\n');
-    const rankingLine = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 410, rankingText || 'Brak wynikow', {
-        fontFamily: 'monospace',
-        fontSize: '20px',
-        color: '#e2e8f0',
-        align: 'center',
-        lineSpacing: 4,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(261);
+      .setDepth(261)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        this.resetRunUi();
+        if (this.scene.isActive('GameScene')) {
+          this.scene.stop('GameScene');
+        }
+        this.scene.start('MenuScene');
+        this.scene.stop('UIScene');
+      });
 
     this.endOverlay = this.add.container(0, 0, [
       panelShadow,
       box,
+      endLogo,
       titleText,
       scoreText,
       highscoreText,
@@ -295,6 +359,8 @@ export class UIScene extends Phaser.Scene {
       rankingLine,
       restartButton,
       ctaButton,
-    ]);
+      menuButton,
+    ].filter(Boolean));
   }
+
 }

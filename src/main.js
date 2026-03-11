@@ -9,8 +9,8 @@ const config = {
   parent: 'app',
   width: GAME_CONSTANTS.BASE_WIDTH,
   height: GAME_CONSTANTS.BASE_HEIGHT,
-  pixelArt: true,
-  roundPixels: true,
+  pixelArt: false,
+  roundPixels: false,
   backgroundColor: '#87ceeb',
   scale: {
     mode: Phaser.Scale.FIT,
