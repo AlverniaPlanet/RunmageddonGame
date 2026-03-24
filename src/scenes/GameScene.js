@@ -13,7 +13,7 @@ export const GAME_CONSTANTS = {
 
   PLAYER_X: 240,
   GROUND_SURFACE_Y: 628,
-  COLLISION_TRIGGER_X_OFFSET: 42,
+  COLLISION_TRIGGER_X_OFFSET: 30,
   SLOW_TRIGGER_X_OFFSET: -8,
   SLOW_GROUND_CONTACT_Y: 24,
   GRASS_LAYER_HEIGHT: 420,
@@ -66,7 +66,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 0,
     displayWidth: 196,
     displayHeight: 96,
-    hitbox: { width: 112, height: 34, offsetX: 0, bottomOffset: 2 },
+    hitbox: { width: 100, height: 32, offsetX: 0, bottomOffset: 2 },
     crop: { x: 0.2, y: 0.34, w: 0.6, h: 0.28 },
   },
   {
@@ -76,7 +76,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 0,
     displayWidth: 162,
     displayHeight: 122,
-    hitbox: { width: 82, height: 42, offsetX: 0, bottomOffset: 2 },
+    hitbox: { width: 74, height: 38, offsetX: 0, bottomOffset: 2 },
     crop: { x: 0.23, y: 0.3, w: 0.54, h: 0.34 },
   },
   {
@@ -86,7 +86,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 0,
     displayWidth: 196,
     displayHeight: 112,
-    hitbox: { width: 112, height: 38, offsetX: 0, bottomOffset: 2 },
+    hitbox: { width: 100, height: 34, offsetX: 0, bottomOffset: 2 },
     crop: { x: 0.2, y: 0.3, w: 0.6, h: 0.32 },
   },
   {
@@ -96,7 +96,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 0,
     displayWidth: 210,
     displayHeight: 92,
-    hitbox: { width: 112, height: 20, offsetX: 0, bottomOffset: 0 },
+    hitbox: { width: 100, height: 18, offsetX: 0, bottomOffset: 0 },
     crop: { x: 0.18, y: 0.38, w: 0.64, h: 0.24 },
   },
   {
@@ -106,7 +106,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 34,
     displayWidth: 286,
     displayHeight: 176,
-    hitbox: { width: 150, height: 34, offsetX: 0, bottomOffset: 6 },
+    hitbox: { width: 136, height: 30, offsetX: 0, bottomOffset: 6 },
     crop: { x: 0.17, y: 0.28, w: 0.66, h: 0.3 },
   },
   {
@@ -116,7 +116,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 38,
     displayWidth: 276,
     displayHeight: 196,
-    hitbox: { width: 158, height: 38, offsetX: 0, bottomOffset: 92 },
+    hitbox: { width: 146, height: 34, offsetX: 0, bottomOffset: 92 },
     crop: { x: 0.14, y: 0.24, w: 0.72, h: 0.36 },
   },
   {
@@ -126,7 +126,7 @@ const OBSTACLE_DEFINITIONS = [
     yOffset: 0,
     displayWidth: 198,
     displayHeight: 108,
-    hitbox: { width: 102, height: 16, offsetX: 0, bottomOffset: 0 },
+    hitbox: { width: 92, height: 14, offsetX: 0, bottomOffset: 0 },
     crop: { x: 0.14, y: 0.33, w: 0.72, h: 0.33 },
     effects: {
       slowMultiplier: GAME_CONSTANTS.MUD_SLOW_MULTIPLIER,
@@ -145,7 +145,7 @@ const BIRD_DEFINITIONS = [
     yOffset: -34,
     displayWidth: 124,
     displayHeight: 64,
-    hitbox: { width: 56, height: 24, offsetX: 0, bottomOffset: 18 },
+    hitbox: { width: 50, height: 22, offsetX: 0, bottomOffset: 18 },
     speedMultiplier: 1.24,
     crop: { x: 0, y: 0, w: 1, h: 1 },
   },
@@ -154,10 +154,10 @@ const BIRD_DEFINITIONS = [
     textureKey: 'bird2_1',
     animKey: 'bird-slide-fly',
     behavior: 'slide',
-    yOffset: -138,
+    yOffset: -74,
     displayWidth: 132,
     displayHeight: 68,
-    hitbox: { width: 62, height: 22, offsetX: 0, bottomOffset: 16 },
+    hitbox: { width: 56, height: 20, offsetX: 0, bottomOffset: 14 },
     speedMultiplier: 1.32,
     crop: { x: 0, y: 0, w: 1, h: 1 },
   },

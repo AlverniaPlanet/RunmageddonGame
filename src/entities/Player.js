@@ -194,18 +194,18 @@ export class Player extends Phaser.GameObjects.Sprite {
   getHitbox() {
     if (this.isSliding) {
       return {
-        x: this.x - 30,
-        y: this.y - 45,
-        width: 60,
-        height: 38,
+        x: this.x - 27,
+        y: this.y - 42,
+        width: 54,
+        height: 34,
       };
     }
 
     return {
-      x: this.x - 23,
-      y: this.y - 89,
-      width: 46,
-      height: 84,
+      x: this.x - 21,
+      y: this.y - 85,
+      width: 42,
+      height: 80,
     };
   }
 }

@@ -57,7 +57,7 @@ export class UIScene extends Phaser.Scene {
 
   createHud() {
     this.hudStatsPlate = this.add
-      .rectangle(262, 28, 500, 36, 0x000000, 0.58)
+      .rectangle(175, 28, 330, 36, 0x000000, 0.58)
       .setStrokeStyle(1, 0x93c5fd, 0.34)
       .setDepth(199);
 
@@ -148,8 +148,8 @@ export class UIScene extends Phaser.Scene {
     this.hideIntro();
   }
 
-  onHudUpdate({ time, score, speed }) {
-    this.hudText.setText(`Predkosc: ${speed}   Punkty: ${score}   Czas: ${time.toFixed(1)} s`);
+  onHudUpdate({ time, score }) {
+    this.hudText.setText(`Punkty: ${score}   Czas: ${time.toFixed(1)} s`);
   }
 
   showIntro() {
@@ -218,11 +218,17 @@ export class UIScene extends Phaser.Scene {
     this.hideEndOverlay();
 
     const title = result === 'win' ? 'META! WYGRANA' : 'GAME OVER';
+    const overlayCenterY = GAME_CONSTANTS.BASE_HEIGHT / 2;
+    const titleY = 232;
+    const scoreY = 290;
+    const highscoreY = 334;
+    const rankingTitleY = 372;
+    const rankingTopY = 398;
     const panelShadow = this.add
-      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2 + 8, GAME_CONSTANTS.BASE_HEIGHT / 2 + 40, 780, 620, 0x000000, 0.45)
+      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2 + 8, overlayCenterY + 8, 780, 620, 0x000000, 0.45)
       .setDepth(259);
     const box = this.add
-      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2, GAME_CONSTANTS.BASE_HEIGHT / 2 + 32, 780, 620, 0x020617, 0.9)
+      .rectangle(GAME_CONSTANTS.BASE_WIDTH / 2, overlayCenterY, 780, 620, 0x020617, 0.9)
       .setStrokeStyle(3, 0x93c5fd, 0.5)
       .setDepth(260);
 
@@ -235,7 +241,7 @@ export class UIScene extends Phaser.Scene {
     }
 
     const titleText = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 284, title, {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, titleY, title, {
         fontFamily: 'monospace',
         fontSize: '48px',
         color: '#f9fafb',
@@ -244,7 +250,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(261);
 
     const scoreText = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 342, `Wynik: ${score}`, {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, scoreY, `Wynik: ${score}`, {
         fontFamily: 'monospace',
         fontSize: '32px',
         color: '#e5e7eb',
@@ -253,7 +259,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(261);
 
     const highscoreText = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 384, `Najlepszy wynik: ${highscore}`, {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, highscoreY, `Najlepszy wynik: ${highscore}`, {
         fontFamily: 'monospace',
         fontSize: '30px',
         color: '#fde68a',
@@ -272,7 +278,7 @@ export class UIScene extends Phaser.Scene {
         .join('\n');
 
     const rankingTitle = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 422, 'Ranking', {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, rankingTitleY, 'Ranking', {
         fontFamily: 'monospace',
         fontSize: '26px',
         color: '#93c5fd',
@@ -281,8 +287,11 @@ export class UIScene extends Phaser.Scene {
       .setDepth(261);
 
     const rankingText = formatRankingLines(ranking);
+    const visibleRankingCount = Math.max(1, Math.min(4, ranking.length));
+    const rankingBlockHeight = visibleRankingCount * 24 + Math.max(0, visibleRankingCount - 1) * 4;
+    const buttonStartY = Math.max(520, rankingTopY + rankingBlockHeight + 28);
     const rankingLine = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 448, rankingText || 'Brak wynikow', {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, rankingTopY, rankingText || 'Brak wynikow', {
         fontFamily: 'monospace',
         fontSize: '20px',
         color: '#e2e8f0',
@@ -293,7 +302,7 @@ export class UIScene extends Phaser.Scene {
       .setDepth(261);
 
     const restartButton = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 552, 'Zagraj ponownie', {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, buttonStartY, 'Zagraj ponownie', {
         fontFamily: 'monospace',
         fontSize: '28px',
         color: '#86efac',
@@ -309,7 +318,7 @@ export class UIScene extends Phaser.Scene {
       });
 
     const ctaButton = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 600, 'Zapisz wynik', {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, buttonStartY + 48, 'Zapisz wynik', {
         fontFamily: 'monospace',
         fontSize: '28px',
         color: '#bfdbfe',
@@ -329,7 +338,7 @@ export class UIScene extends Phaser.Scene {
       });
 
     const menuButton = this.add
-      .text(GAME_CONSTANTS.BASE_WIDTH / 2, 646, 'Menu', {
+      .text(GAME_CONSTANTS.BASE_WIDTH / 2, buttonStartY + 94, 'Menu', {
         fontFamily: 'monospace',
         fontSize: '24px',
         color: '#e2e8f0',
